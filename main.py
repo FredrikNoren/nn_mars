@@ -10,6 +10,23 @@ import matplotlib.pyplot as plt
 import random
 from skimage.measure import block_reduce
 
+def draw_mars_data(data):
+    u = np.unique(data.flatten())
+    u.sort()
+    print(u[0], u[1])
+    #print np.min(data), np.max(data)
+    data = np.clip(data, u[1], np.max(data))
+    imgplot = plt.imshow(data, interpolation="nearest")
+    plt.waitforbuttonpress()
+#
+# #gtif = gdal.Open("DTEEC_036307_1665_035951_1665_A01.IMG", gdalconst.GA_ReadOnly)
+# mars_global = gdal.Open("MOLA/megt90n000cb.lbl", gdalconst.GA_ReadOnly)
+# print(mars_global.GetGeoTransform())
+# #print(mars_global.ReadAsArray().shape)
+# draw_mars_data(mars_global.ReadAsArray())
+# exit()
+
+# Complete MOLA data: http://astrogeology.usgs.gov/search/map/Mars/GlobalSurveyor/MOLA/Mars_MGS_MOLA_DEM_mosaic_global_463m
 # Source data http://www.uahirise.org
 mars = [
     gdal.Open("DTEEC_036307_1665_035951_1665_A01.IMG", gdalconst.GA_ReadOnly),
@@ -27,25 +44,16 @@ learning_rate = 0.01
 training_epochs = 200
 display_step = 1
 batch_size = 256
-image_size = 32
-input_image_size = 4
+image_size = 16
+input_image_size = 16
 show_test_count = 7
 
 # Network Parameters
 n_input = input_image_size * input_image_size
 n_output = image_size * image_size
 n_hidden = 32 # 1st layer num features
-n_hidden_encoding = n_output # 2nd layer num features
+n_hidden_encoding = 32 # 2nd layer num features
 
-
-def draw_mars_data(data):
-    u = np.unique(data.flatten())
-    u.sort()
-    print(u[0], u[1])
-    #print np.min(data), np.max(data)
-    data = np.clip(data, u[1], np.max(data))
-    imgplot = plt.imshow(data, interpolation="nearest")
-    plt.waitforbuttonpress()
 
 def downsample_block_mean(image, size):
     return block_reduce(image, block_size=(size, size), func=np.mean)
@@ -90,26 +98,6 @@ def get_data_batch(count):
         batch_full.append(full)
     return batch_xs, batch_ys, batch_full
 
-test_set_xs, test_set_ys, test_set_full = get_data_batch(show_test_count)
-def show_test_set(sess):
-    # Applying encode and decode over test set
-    encode_decode = sess.run(y_pred, feed_dict={X: test_set_xs, Y: test_set_ys})
-
-    for i in range(show_test_count):
-        test_viz_a[0][i].imshow(np.reshape(test_set_xs[i], (input_image_size, input_image_size)), interpolation="nearest")
-        test_viz_a[1][i].imshow(np.reshape(test_set_ys[i], (image_size, image_size)), interpolation="nearest")
-        test_viz_a[2][i].imshow(np.reshape(encode_decode[i], (image_size, image_size)), interpolation="nearest")
-        test_viz_a[3][i].imshow(np.reshape(encode_decode[i] - test_set_ys[i], (image_size, image_size)), interpolation="nearest")
-        # x = np.reshape(test_set_xs[i], (int(image_size/2), image_size))
-        # y = np.reshape(encode_decode[i], (int(image_size/2), image_size))
-        # a[1][i].imshow(np.concatenate((x, y)))
-    plt.draw()
-
-
-# tf Graph input (only pictures)
-X = tf.placeholder("float", [None, n_input])
-Y = tf.placeholder("float", [None, n_output])
-
 # Building the encoder
 def encoder(x):
     return tf.nn.sigmoid(tf.add(tf.matmul(x, tf.Variable(tf.truncated_normal([n_input, n_hidden_encoding], stddev=0.1))),
@@ -133,10 +121,10 @@ def encoder(x):
     #                               tf.Variable(tf.random_normal([n_hidden_encoding]))))
 
 
-# Building the decoder
+dec_h = tf.Variable(tf.truncated_normal([n_hidden_encoding, n_output], stddev=0.1))
+dec_b = tf.Variable(tf.constant(0.1, shape=[n_output]))
 def decoder(x):
-    return tf.nn.sigmoid(tf.add(tf.matmul(x, tf.Variable(tf.truncated_normal([n_hidden_encoding, n_output], stddev=0.1))),
-                                  tf.Variable(tf.constant(0.1, shape=[n_output]))))
+    return tf.nn.sigmoid(tf.add(tf.matmul(x, dec_h), dec_b))
 
     # layer_1 = tf.nn.conv2d(x, tf.Variable(tf.truncated_normal([7, 7, 1, 32])), strides=[1, 1, 1, 1], padding='SAME')
     # layer_1_flat = tf.reshape(layer_1, [-1, 32*image_size*image_size])
@@ -153,6 +141,38 @@ def decoder(x):
     #                            tf.Variable(tf.random_normal([n_hidden]))))
     # return tf.nn.sigmoid(tf.add(tf.matmul(layer_4, tf.Variable(tf.random_normal([n_hidden, n_output]))),
     #                               tf.Variable(tf.random_normal([n_output]))))
+
+test_set_xs, test_set_ys, test_set_full = get_data_batch(show_test_count)
+
+
+disp_encoding_placeholder = tf.placeholder("float", [None, n_hidden_encoding])
+disp_decoder = decoder(disp_encoding_placeholder)
+disp_rand_encoding = []
+tmp_rand = np.random.rand(n_hidden_encoding)
+for i in range(show_test_count):
+    r = np.copy(tmp_rand)
+    r[0] = i / show_test_count
+    disp_rand_encoding.append(r)
+def show_test_set(sess):
+    # Applying encode and decode over test set
+    encode_decode = sess.run(y_pred, feed_dict={X: test_set_xs, Y: test_set_ys})
+    decoder_random_res = sess.run(disp_decoder, feed_dict={disp_encoding_placeholder: disp_rand_encoding })
+
+    for i in range(show_test_count):
+        test_viz_a[0][i].imshow(np.reshape(test_set_xs[i], (input_image_size, input_image_size)), interpolation="nearest")
+        test_viz_a[1][i].imshow(np.reshape(test_set_ys[i], (image_size, image_size)), interpolation="nearest")
+        test_viz_a[2][i].imshow(np.reshape(encode_decode[i], (image_size, image_size)), interpolation="nearest")
+        test_viz_a[3][i].imshow(np.reshape(encode_decode[i] - test_set_ys[i] , (image_size, image_size)), interpolation="nearest")
+        test_viz_a[4][i].imshow(np.reshape(decoder_random_res[i], (image_size, image_size)), interpolation="nearest")
+        # x = np.reshape(test_set_xs[i], (int(image_size/2), image_size))
+        # y = np.reshape(encode_decode[i], (int(image_size/2), image_size))
+        # a[1][i].imshow(np.concatenate((x, y)))
+    plt.draw()
+
+
+# tf Graph input (only pictures)
+X = tf.placeholder("float", [None, n_input])
+Y = tf.placeholder("float", [None, n_output])
 
 # Construct model
 encoder_op = encoder(X)
@@ -179,8 +199,14 @@ sess.run(init)
 # plt.axis([0, training_epochs, 0, 1])
 plt.ion()
 
-test_viz_f, test_viz_a = plt.subplots(4, show_test_count, figsize=(show_test_count, 4))
+test_viz_f, test_viz_a = plt.subplots(5, show_test_count, figsize=(show_test_count, 5))
 test_viz_f.show()
+
+test_viz_a[0][0].set_ylabel("X")
+test_viz_a[1][0].set_ylabel("Y")
+test_viz_a[2][0].set_ylabel("Y_pred")
+test_viz_a[3][0].set_ylabel("Error")
+test_viz_a[4][0].set_ylabel("Sampled")
 
 learn_viz_f, learn_viz_a = plt.subplots()
 learn_viz_f.show()
