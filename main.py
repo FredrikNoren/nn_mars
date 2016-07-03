@@ -30,11 +30,11 @@ def draw_mars_data(data):
 # Complete MOLA data: http://astrogeology.usgs.gov/search/map/Mars/GlobalSurveyor/MOLA/Mars_MGS_MOLA_DEM_mosaic_global_463m
 # Source data http://www.uahirise.org
 mars = [
-    gdal.Open("DTEEC_036307_1665_035951_1665_A01.IMG", gdalconst.GA_ReadOnly),
-    gdal.Open("DTEED_032193_1990_031837_1990_A01.IMG", gdalconst.GA_ReadOnly),
-    gdal.Open("DTEEC_034109_2085_033608_2085_A01.IMG", gdalconst.GA_ReadOnly),
-    gdal.Open("DTEED_022962_1570_022672_1570_A01.IMG", gdalconst.GA_ReadOnly),
-    gdal.Open("DTEEC_028149_2085_028215_2085_A01.IMG", gdalconst.GA_ReadOnly),
+    gdal.Open("HIRISE/DTEEC_036307_1665_035951_1665_A01.IMG", gdalconst.GA_ReadOnly),
+    gdal.Open("HIRISE/DTEED_032193_1990_031837_1990_A01.IMG", gdalconst.GA_ReadOnly),
+    gdal.Open("HIRISE/DTEEC_034109_2085_033608_2085_A01.IMG", gdalconst.GA_ReadOnly),
+    gdal.Open("HIRISE/DTEED_022962_1570_022672_1570_A01.IMG", gdalconst.GA_ReadOnly),
+    gdal.Open("HIRISE/DTEEC_028149_2085_028215_2085_A01.IMG", gdalconst.GA_ReadOnly),
     ]
 mars_data = []
 for v in mars: mars_data.append(v.ReadAsArray())
