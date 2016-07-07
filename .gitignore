@@ -2,3 +2,6 @@ DTEE*
 /MNIST_data
 *.pyc
 /model
+/MOLA
+/HIRISE
+*.npy
