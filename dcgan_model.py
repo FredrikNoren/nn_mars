@@ -4,6 +4,9 @@ from __future__ import division, print_function, absolute_import
 import tensorflow as tf
 import numpy as np
 import random
+import datetime
+import os
+import errno
 
 
 def normalize(x):
@@ -63,7 +66,8 @@ def descriminator(x, reuse=False):
 
 
 class DCGAN(object):
-    def __init__(self):
+    def __init__(self, sess):
+        self.sess = sess
         self.batch_size = 6
         self.z_dim = 100
         self.learning_rate_desc = 0.0001
@@ -78,12 +82,21 @@ class DCGAN(object):
 
         self.gen_desc, self.gen_desc_logits, self.gen_desc_filters_out = descriminator(self.gen, reuse=True)
 
+    def load(self, path):
+        saver = tf.train.Saver()
+        saver.restore(self.sess, path)
+
     def prepare_train(self):
         print("Loading mars data")
         self.mars_data = np.load("hirise_20.npy")
         print("Loading mars data done.")
 
     def train(self, epoch_callback=None):
+
+        saver = tf.train.Saver()
+        save_path = datetime.datetime.now().strftime('model/%b%d_%H%M')
+        mkdir_p(save_path)
+        save_filename = save_path + '/save'
 
         real_desc_cost = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(self.real_desc_logits, tf.ones_like(self.real_desc_logits)))
         gen_desc_cost = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(self.gen_desc_logits, tf.zeros_like(self.gen_desc_logits)))
@@ -106,18 +119,19 @@ class DCGAN(object):
 
         init = tf.initialize_all_variables()
 
-        with tf.Session() as sess:
-            sess.run(init)
-            self.sess = sess
+        self.sess.run(init)
 
-            for epoch in range(100000):
-                batch_x = self.get_real_data_batch_x(self.batch_size)
-                batch_z = self.get_data_batch_z(self.batch_size)
-                _, real_desc_cost_val, gen_desc_cost_val = sess.run([desc_optim, real_desc_cost, gen_desc_cost], feed_dict={ self.X: batch_x, self.Z: batch_z })
-                batch_z = self.get_data_batch_z(self.batch_size)
-                _, gen_cost_val = sess.run([gen_optim, gen_cost], feed_dict={ self.Z: batch_z })
-                if epoch_callback:
-                    epoch_callback(epoch, (real_desc_cost_val, gen_desc_cost_val, gen_cost_val))
+        for epoch in range(100000):
+            batch_x = self.get_real_data_batch_x(self.batch_size)
+            batch_z = self.get_data_batch_z(self.batch_size)
+            _, real_desc_cost_val, gen_desc_cost_val = self.sess.run([desc_optim, real_desc_cost, gen_desc_cost], feed_dict={ self.X: batch_x, self.Z: batch_z })
+            batch_z = self.get_data_batch_z(self.batch_size)
+            _, gen_cost_val = self.sess.run([gen_optim, gen_cost], feed_dict={ self.Z: batch_z })
+            if epoch % 100 == 0:
+                p = saver.save(self.sess, save_filename, global_step=epoch)
+                print('PATH', p)
+            if epoch_callback:
+                epoch_callback(epoch, (real_desc_cost_val, gen_desc_cost_val, gen_cost_val))
 
         print("Optimization Finished!")
 
@@ -145,3 +159,13 @@ class DCGAN(object):
 
     def get_data_batch_z(self, batch_size):
         return np.random.uniform(-1, 1, [batch_size, self.z_dim]).astype(np.float32)
+
+
+def mkdir_p(path):
+    try:
+        os.makedirs(path)
+    except OSError as exc:  # Python >2.5
+        if exc.errno == errno.EEXIST and os.path.isdir(path):
+            pass
+        else:
+            raise
