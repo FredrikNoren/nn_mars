@@ -1,14 +1,13 @@
-import numpy as np
-import matplotlib.pyplot as plt
+import random
+from array import array
+output_file = open('heightmap.dhm', 'wb')
+int_array = array('i', [512, 512])
+int_array.tofile(output_file)
 
-plt.axis([0, 10, 0, 1])
-plt.ion()
+floats = []
+for i in range(512*512):
+    floats.append(random.random())
 
-for i in range(10):
-    y = np.random.random()
-    plt.scatter(i, y)
-    plt.plot(i, y)
-    plt.pause(0.05)
-
-while True:
-    plt.pause(0.05)
+float_array = array('f', floats)
+float_array.tofile(output_file)
+output_file.close()

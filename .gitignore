@@ -5,3 +5,7 @@ DTEE*
 /MOLA
 /HIRISE
 *.npy
+/heightmaps
+/heightmaps-rendered
+node_modules
+test.py

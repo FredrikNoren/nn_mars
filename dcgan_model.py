@@ -45,11 +45,11 @@ def linear(input_, output_size, name="linear"):
 def generator(z):
     with tf.variable_scope("generator"):
         batch_size = tf.shape(z)[0]
-        l1 = lrelu(linear(z, 4 * 4 * 8))
-        l1 = tf.reshape(l1, [-1, 4, 4, 8])
-        l2 = lrelu(deconv2d(l1, [batch_size, 8, 8, 8], name="deconv_l1"))
-        l3 = lrelu(deconv2d(l2, [batch_size, 16, 16, 8], name="deconv_l2"))
-        l4 = lrelu(deconv2d(l3, [batch_size, 32, 32, 8], name="deconv_l3"))
+        l1 = lrelu(linear(z, 4 * 4 * 256))
+        l1 = tf.reshape(l1, [-1, 4, 4, 256])
+        l2 = lrelu(deconv2d(l1, [batch_size, 8, 8, 128], name="deconv_l1"))
+        l3 = lrelu(deconv2d(l2, [batch_size, 16, 16, 64], name="deconv_l2"))
+        l4 = lrelu(deconv2d(l3, [batch_size, 32, 32, 32], name="deconv_l3"))
         l5 = tf.sigmoid(deconv2d(l4, [batch_size, 64, 64, 1], name="deconv_l4"))
         return l5
 
@@ -57,18 +57,18 @@ def descriminator(x, reuse=False):
     with tf.variable_scope("descriminator") as scope:
         if reuse:
             scope.reuse_variables()
-        l1 = lrelu(conv2d(x, 8, name="conv_l1"))
-        l2 = lrelu(conv2d(l1, 8, name="conv_l2"))
-        l3 = lrelu(conv2d(l2, 8, name="conv_l3"))
-        l4 = lrelu(conv2d(l3, 8, name="conv_l4"))
-        l5 = linear(tf.reshape(l4, [-1, 4 * 4 * 8]), 1)
+        l1 = lrelu(conv2d(x, 32, name="conv_l1"))
+        l2 = lrelu(conv2d(l1, 64, name="conv_l2"))
+        l3 = lrelu(conv2d(l2, 128, name="conv_l3"))
+        l4 = lrelu(conv2d(l3, 256, name="conv_l4"))
+        l5 = linear(tf.reshape(l4, [-1, 4 * 4 * 256]), 1)
         return tf.sigmoid(l5), l5, [l1, l2, l3, l4]
 
 
 class DCGAN(object):
     def __init__(self, sess):
         self.sess = sess
-        self.batch_size = 6
+        self.batch_size = 16
         self.z_dim = 100
         self.learning_rate_desc = 0.0001
         self.learning_rate_gen  = 0.0001
@@ -140,15 +140,17 @@ class DCGAN(object):
         xpos = random.randint(0, self.mars_data[i].shape[0])
         ypos = random.randint(0, self.mars_data[i].shape[1])
         subdata = self.mars_data[i][xpos:(xpos + self.image_size), ypos:(ypos + self.image_size)]
-        if subdata.shape[0] != self.image_size or subdata.shape[1] != self.image_size or np.min(subdata) < -5000:
+        if subdata.shape[0] != self.image_size or subdata.shape[1] != self.image_size or np.min(subdata) < -5000 or np.var(subdata) < 1000:
             return self.get_subimage()
         else:
             return subdata
 
     def get_real_data_batch_x(self, batch_size):
         batch_xs = np.zeros((batch_size, self.image_size, self.image_size, 1))
+        max_subimage_diff = 1226.27258301 # Sampled 50000 subimages to see what the biggest diff was
         for i in range(batch_size):
-            x = normalize(self.get_subimage())
+            x = self.get_subimage()
+            x = (x - np.min(x)) / max_subimage_diff
             x = np.rot90(x, random.randint(0, 3))
             if random.randint(0, 1) == 0:
                 x = np.fliplr(x)
